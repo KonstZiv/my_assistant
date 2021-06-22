@@ -31,14 +31,16 @@ def main():
         path_file = Path(path) / name
         addressbook = deserialize_users(path_file)
 
-    menu = '''You can :
-                1. add abonent to addressbook
-                2. change abonent's record in addressbook
-                3. delete abonent from addressbook
-                4. seek abonent or phone
-                5. show all 
-                6. end 
-            Choose menu item number'''
+    menu = '''Вы можете:
+                1. добавить абонента в адресную книгу
+                2. изменить поля в адресной книге для существующего абонента
+                3. удалить абонента из адресной книги
+                4. искать абонента в адресной книге по любым полям и вхождениям в них
+                5. просмотреть все записи в адресной книге 
+                6. завершить работу 
+            выберите желаемый пункт меню
+                      (P.S. или напишите мне простым языком - чего Вы хотите. Постараюсь понять)
+                      (P.P.S. если Ваши желания будут выражены простыми предложениями - мне будет легче понять)'''
 
     while True:
         # addressbook.add_fake_records(40)
@@ -53,9 +55,9 @@ def main():
         result = get_handler(input_string, addressbook)
         if not result:
             serialize_users(addressbook, path_file)
-            print('Good bye!')
+            print('Пока!')
             break
-        print(result)
+        pretty_print(result)
 
 
 if __name__ == '__main__':

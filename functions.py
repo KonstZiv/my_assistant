@@ -7,6 +7,21 @@ import re
 import pymorphy2
 
 
+def pretty_print(text, color='green'):
+    # функция для Ярослава
+    print(colored(text, color=color))
+    print(chr(3196)*80)
+
+
+def pretty_input(text):
+    # функция для Ярослава
+    # print(chr(3196)*80)
+    print(colored(text, color='green'))
+    user_input = input('>>> ')
+    print(colored(chr(3196) * 80, color='green'))
+    return user_input
+
+
 def pretty_table(addressbook, N=10):
     # выводит на экран всю адресную книгу блоками по N записей. Основная обработка
     # реализована как метод класса addressbook, что позволяет использовать аналогичный
@@ -14,14 +29,17 @@ def pretty_table(addressbook, N=10):
     # объект типа addressbook с результатами
     n = int(N)
     pretty_print(f'всего к выводу {len(addressbook)} записей: ')
+    '''
     for block in addressbook.out_iterator(n):
         print(pretty(block))
         usr_choice = input(colored(
             'Нажмите "Enter", или введите "q", что бы закончить просмотр.\n', 'yellow'))
         if usr_choice:
-            '''Если пользователь вводит любой символ, его перебрасывает на основное меню.'''
+            """Если пользователь вводит любой символ, его перебрасывает на основное меню."""
             break
-        continue
+       continue
+    '''
+    pretty_print(str(addressbook), color='red')
 
     return colored('Вывод окончен!', 'yellow')
 
@@ -51,21 +69,6 @@ def pretty(block):
         xr.append(a)
         table.add_row(xr)
     return colored(table, 'green')
-
-
-def pretty_input(text):
-    # функция для Ярослава
-    # print(chr(3196)*80)
-    print(colored(text, color='green'))
-    user_input = input('>>> ')
-    print(colored(chr(3196) * 80, color='green'))
-    return user_input
-
-
-def pretty_print(text):
-    # функция для Ярослава
-    print(colored(text, color='green'))
-    print(chr(3196)*80)
 
 
 def deserialize_users(path):
@@ -168,7 +171,7 @@ def get_handler(res_pars, addressbook):
         - search - формат: search pattern - поиск совпадений по полям имени и телефонов. Будут выведены все записи в которых есть совпадения'''
 
     def hello_f(*args):
-        return 'How can I help you?'
+        return 'Привет! Чем я могу Вам помочь?'
 
     def exit_f(*args):
         return None
@@ -184,55 +187,74 @@ def get_handler(res_pars, addressbook):
         add_phone(record)
         change_bd(record)
         change_adr(record)
-        change_eml(record)
+        add_eml(record)
         add_note(record)
 
-        pretty_print(f'в адресную книгу внесена запись: \n{record}')
-        return True
+        return f'в адресную книгу внесена запись: \n{record}'
+
+    def search_record(adressbook):
+        pattern = pretty_input(
+            'введите имя записи или часть имени/значения поля, которое однозначно определяет запись: ')
+        res = addressbook.search(pattern)
+        while len(res) != 1:
+            pretty_print(f'найдено {len(res)} записей')
+            print('найдено имя:', *list(res))
+            pattern = pretty_input(
+                'введите имя записи или часть имени/значения поля, которое однозначно определяет запись: ')
+            res = addressbook.search(pattern)
+            print(len(res))
+        print(res.items(), '  ', type(res.items()))
+        name, record = list(res.items())[0]
+        pretty_print(f'найдена запись с именем {name}')
+        return record
 
     @error_handler
     def add_note(record):
-        pass
+        if isinstance(record, Record):
+            note_new = pretty_input(
+                'введите заметку. Дата и время будут добавлены автоматически: ')
+            record.add_note(note_new)
+            return f'в запись добавлена заметка: \n {note_new}'
+        return 'такой записи не существует или поисковом шаблону соответствует более одной записи'
 
     @error_handler
-    def change_note(record):
-        pass
-
-    @error_handler
-    def change_eml(record):
-        pass
+    def add_eml(record):
+        if isinstance(record, Record):
+            email_new = pretty_input(
+                'введите e-mail: ')
+            record.add_email(email_new)
+            return f'в запись добавлен e-mail: \n {record.emails[-1]}'
+        return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
 
     @error_handler
     def change_adr(record):
-        pass
-
-    def change_name(record):
-        name = pretty_input('Введите новое имя ')
-        addressbook.del_record(name)
-        record.change_name(name)
-        addressbook(record)
+        if isinstance(record, Record):
+            # address_old = record.address.__repr__() if record.address else 'пока не задан'
+            # pretty_print(f'текущий адрес:  {address_old}')
+            address_new = pretty_input('введите адрес ("ввод" - пропустить): ')
+            record.add_address(address_new)
+            return f'в запись добавлен адрес: \n {record.address}'
+        return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
 
     @error_handler
     def change_bd(record):
-        birthday_str = pretty_input(
-            'введите день рождения в формате дд-мм-гггг ("ввод" - пропустить): ')
-        if birthday_str:
-            result = record.add_birthday(birthday_str)
-            if isinstance(result, Exception):
-                return result
-            return f'в запись добавлен день рождения: \n {record}'
-        else:
-            return 'абоненту день рождения не добавлен'
+        if isinstance(record, Record):
+            # birthday_old = record.birthday.__repr__() if record.birthday else 'пока не задан'
+            # pretty_print(f'текущий день рождения:  {birthday_old}')
+            birthday_str = pretty_input(
+                'введите день рождения в формате дд-мм-гггг ("ввод" - пропустить): ')
+            record.add_birthday(birthday_str)
+            return f'в запись добавлен день рождения: \n {record.birthday.__repr__()}'
+        return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
 
     @error_handler
     def add_phone(record):
-        # позволяет добавить в запись дополнительный телефон
-        phone = pretty_input('Entry phone number ')
-        result = record.add_phone(phone)
-
-        if isinstance(result, Exception):
-            return result
-        return f'в запись добавлен новый телефон: \n {record}'
+        if isinstance(record, Record):
+            # позволяет добавить в запись дополнительный телефон
+            phone = pretty_input('Введите номер телефона: ')
+            record.add_phone(phone)
+            return f'в запись добавлен новый телефон: \n {record}'
+        return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
 
     @error_handler
     def change_phone(record):
@@ -249,8 +271,7 @@ def get_handler(res_pars, addressbook):
 
     def change_f(addressbook):
 
-        name = pretty_input('Введите имя ')
-        record = addressbook[name]
+        record = search_record(addressbook)
         pretty_print(record)
         pretty_print(menu_change)
         item_number = input('>>>  ')
@@ -293,11 +314,6 @@ def get_handler(res_pars, addressbook):
                    'adress': ['адрес', 'город', 'улица', 'ул.', 'проспект', 'поселок', 'село', 'деревня', 'бульвар', 'дом', 'квартира',
                               'кв.', 'площадь', 'пос.', 'набережная']}
 
-        def find_email(raw_text):
-            regex = re.compile('[^ @]*@[^ ]*')
-            result = regex.findall(raw_text)
-            return result if result else None
-
         def pre_processing_str(raw_str):
             # Эта функция считает, что входящий текст - ОДНО предложение. \
             # осуществляет предварительную обработку строки - \
@@ -315,7 +331,7 @@ def get_handler(res_pars, addressbook):
                 i for i in text_words_list if (i not in stop_words)]
             return prepare_text_words_list
 
-        def find_predictors(prepare_text_word_list, commands_scoup=COMMANDS, objects_scoup=OBJECTS):
+        def find_predictors(sentence, context, commands_scoup=COMMANDS, objects_scoup=OBJECTS):
             # получает на вход предварительно обработанный список слов из введенной строки, \
             # словарь возможных значений команд и словарь созможных значений объектов (то, над \
             # чем могут совершаться команды). Возвращает словарь, в котором ключами являются \
@@ -325,13 +341,18 @@ def get_handler(res_pars, addressbook):
 
             morph_ru = pymorphy2.MorphAnalyzer()
 
-            predictors_dict = {
-                'name': None,
-                'commands': [],
-                'objects': [],
-                'phones': [],
-                'emails': []
-            }
+            def find_emails(sentence):
+                regex = re.compile('[^ @]*@[^ ]*')
+                result = regex.findall(sentence)
+                return result if result else None
+
+            def find_selected_text(sentence):
+                # выделяет и возвращает из предложения текст, выделенный любой парой
+                # (в начале и в конце) знаков ()
+                # Если не найдено ничго, возвращает None
+                regex = re.compile('(.+)')
+                result = regex.search(sentence)
+                return result.group()[1:-1] if result else None
 
             def find_commands(word_of_morph_res, commands_scoup=COMMANDS):
                 # из результатов морфлогического разбора отдельных слов выбираю ТОЛЬКО глаголы\
@@ -356,25 +377,39 @@ def get_handler(res_pars, addressbook):
                             break
                 return res
 
-            def find_name(morph_ru_result):
+            def find_name(word_of_morph_res):
                 # из результатов морфлогического разбора отдельных слов выбираю ТОЛЬКО с признаком,\
                 # одушевленности и формирую из них одну строку. Если не найдено ничего - None
                 res = []
-                for word in morph_ru_result:
-                    #print(f'{word[0].normal_form}    {word[0].tag.animacy}')
+                for word in word_of_morph_res:
+                    # print(f'{word[0].normal_form}    {word[0].tag.animacy}')
                     if word.tag.animacy == 'anim':
                         res.append(word.normal_form)
                 return ' '.join(res) if res else None
 
-            def find_phone(raw_text):
+            def find_phones(sentence):
                 regex = re.compile('\+?[0-9-xX()\[\]]{5,25}')
-                result = regex.search(raw_text)
-                return result.group() if result else None
+                result = regex.findall(sentence)
+                return result if result else None
+
+            predictors_dict = {
+                'name': None,
+                'selected_text': None,
+                'commands': [],
+                'objects': [],
+                'phones': [],
+                'emails': [],
+                'context': None
+            }
+            predictors_dict['selected_text'] = find_selected_text(sentence)
+            predictors_dict['phones'] = find_phones(sentence)
+            predictors_dict['emails'] = find_emails(sentence)
+            prepare_text_words_list = pre_processing_str(sentence)
 
             # проводим морфологический разбор слов в списке переданных подготовленных слов,\
             #  выбираем только наиболее вероятные знаяения для слов (выбор єлемента с индексом 0)
             morph_ru_result = [morph_ru.parse(word)[0]
-                               for word in prepare_text_word_list]
+                               for word in prepare_text_words_list]
 
             for word in morph_ru_result:
                 command = find_commands(word, commands_scoup=COMMANDS)
@@ -385,15 +420,22 @@ def get_handler(res_pars, addressbook):
                 if object_for:
                     predictors_dict['objects'].append(object_for)
 
-                phone = find_phone(word.word)
-                if phone:
-                    predictors_dict['phones'].append(phone)
-
             predictors_dict['name'] = find_name(morph_ru_result)
+
+            if predictors_dict['name']:
+                predictors_dict['context'] = predictors_dict['name']
+            else:
+                predictors_dict['context'] = None if len(
+                    context_list) == 0 else context_list[-1]
+            context_list.append(predictors_dict['context'])
+
+            print(prepare_text_words_list)  # отладочный вывод
+
+            print(predictors_dict)  # отладочный вывод
 
             return predictors_dict
 
-        def hendler_raw(predictors_dict, address_book):
+        def handler_raw(predictors_dict, address_book):
             # получает на вход словарь с набором выявленных предикторов \
             # и на основе их анализа предлагает действия для их обработки
             # возвращает строку с рапортом о совершенных действиях или None\
@@ -556,41 +598,32 @@ def get_handler(res_pars, addressbook):
             #    record.add_email(elem)
             return record
 
-        prepare_text_words_list = pre_processing_str(res_pars)
-        print(prepare_text_words_list)  # отладочный вывод
-
-        # получаем словарь выявленных предикторов - подробнее в описании функции
-        predictors_dict = find_predictors(prepare_text_words_list)
-
-        # для словаря предикторов ищим в исходной стпроке e-mail (это костыль - все\
-        #  это должно делаться функцией find_predictors(), но так проще сейчас)
-        email = find_email(res_pars)
-        if email:
-            predictors_dict['emails'].extend(email)
-
-        print(predictors_dict)  # отладочный вывод
-
-        return hendler_raw(predictors_dict, addressbook)
+            # из сырой строки создаем список предложений
+        sentences_list = nltk.sent_tokenize(res_pars)
+        context_list = []
+        for sentence in sentences_list:
+            predictors_dict = find_predictors(sentence, context_list)
+            pretty_print(handler_raw(predictors_dict, addressbook))
 
     menu_change = '''
-    What you want to change:    1. name
-                                2. change phone
-                                3. add phone
-                                4. change birthday
-                                5. change e-mail
-                                6. change address
-                                7. change note
-                                8. add note
-    '''
+    Выберите необходимы пункт меню: 
+                            1. Добавить номер телефона (в записи может быть несколько разных номеров).
+                            2. Удалить номер телефона.
+                            3. Добавить e-mail (в записи может быть несколько e-mail).
+                            4. Удалить e-mail.
+                            5. Добавить/заменить дату рождения (может быть только одна).
+                            6. Добавить/заменить почтовый адрес (может быть только один).
+                            7. Добавить заметку (заметки не удаляются, они накапливаются).
+                '''
 
-    func_change = {'1': change_name,
+    func_change = {'1': add_phone,
                    '2': change_phone,
                    '3': add_phone,
                    '4': change_bd,
-                   '5': change_eml,
+                   '5': add_eml,
                    '6': change_adr,
-                   '7': change_note,
-                   '8': add_note}
+                   '7': add_note,
+                   }
 
     HANDLING = {
         '1': add_f,

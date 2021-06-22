@@ -210,20 +210,26 @@ def get_handler(res_pars, addressbook):
     def exit_f(*args):
         return None
 
+    def is_in(addressbook, name):
+        return name in addressbook
+
     def add_f(addressbook):
         #  сначала создает запись с именем
         #  потом последовательно вызывает функции
         # для заполнения телефона, д/р, заметки, и т.д.
         name = pretty_input('Введите имя ')
+        while is_in(addressbook, name):
+            name = pretty_input(
+                'Введите другое имя. Такое имя уже есть (Enter -выход в предыдущее меню')
+            if not name:
+                return True
         record = Record(name)
         addressbook.add_record(record)
-
         add_phone(record)
         change_bd(record)
         change_adr(record)
         add_eml(record)
         add_note(record)
-
         return f'в адресную книгу внесена запись: \n{record}'
 
     def search_record(adressbook):
@@ -543,7 +549,6 @@ def get_handler(res_pars, addressbook):
             #  если никакие действия совершены быть не могут
 
             if ('search' in predictors_dict['commands']) and predictors_dict['selected_text']:
-                print('точка 1')
                 chois = pretty_input(
                     f'''распознана команда ПОИСК. \n
                             текст в скобках, по всей видимости, является паттерном для поиска:\n
@@ -581,6 +586,39 @@ def get_handler(res_pars, addressbook):
                 elif chois == '2':
                     return search_bd(address_book)
                 return True
+
+            if ('add' in predictors_dict['commands']) and (not predictors_dict['name']) and (not predictors_dict['objects']):
+                chois = pretty_input(
+                    f'''распознана команда ДОБАВИТЬ. \n
+                            не распознано имя абонента
+                            Выберите действие:
+                                1. создать новую запись
+                                4. выход
+                        ''')
+                if chois == '1':
+                    return add_f(address_book)
+                elif chois == '2':
+                    return True
+            elif ('add' in predictors_dict['commands']) and predictors_dict['name'] and not predictors_dict['objects'] and not predictors_dict['phones'] and not predictors_dict['emails']:
+                if is_in(address_book, predictors_dict['name']):
+                    pretty_print(
+                        f"запись с именем {predictors_dict['name']} существует")
+                    item_number = pretty_input(menu_change)
+                    print('before')
+                    record = address_book[predictors_dict['name']]
+                    print('after')
+                    pretty_print(record)
+                    return func_change[item_number](record)
+                pretty_print(
+                    f"запись с именем {predictors_dict['name']} не существует. Создаем запись:")
+                record = Record(predictors_dict['name'])
+                address_book.add_record(record)
+                add_phone(record)
+                change_bd(record)
+                change_adr(record)
+                add_eml(record)
+                add_note(record)
+                return f'в адресную книгу внесена запись: \n{record}'
 
         def gen_record(predictors_dict):
             # получает словарь выделенных из текста параметров и создает объект типа Record с этими параметрами

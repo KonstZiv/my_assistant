@@ -153,6 +153,10 @@ class Record:
             raise ValueError(
                 'Невозможно удалить несуществующий адрес электронной почты.')
 
+    def change_email(self, old_email, new_email):
+        self.del_email(self, old_email)
+        self.add_email(self, new_email)
+
     def add_note(self, note):
         self.note[datetime.now().strftime('%Y-%m-%d %H:%M:%S')] = note
 
@@ -273,7 +277,7 @@ class Record:
         # date_stop=False, то сравнение проходит не по интервалу дат, а по\
         # одной дате date. Если year=False - то при сравнении год не \
         # учитывается, иначе год участвует в сравнении
-        if not self.birthday.birthday:
+        if not self.birthday:
             # если дата рождения не записана - возвращаем None
             return None
 
@@ -360,7 +364,7 @@ class AddressBook(UserDict):
         # удаляет запись с ключем name (строка)
         # из существующей адресной книги. Если такого имени нет - генерирует исключение
         if name in self:
-            self.pop(name)
+            return self.pop(name)
         else:
             raise KeyError('записи с таким именем нет в адресной книге')
 

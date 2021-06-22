@@ -7,6 +7,7 @@ import re
 import pymorphy2
 import itertools
 import textwrap
+from datetime import datetime
 
 
 def pretty_print(text, color='green'):
@@ -258,6 +259,44 @@ def get_handler(res_pars, addressbook):
             return f'в запись добавлен e-mail: \n {record.emails[-1]}'
         return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
 
+    def del_phone(record):
+        pass
+
+    @error_handler
+    def change_eml(record):
+        if isinstance(record, Record):
+            answer = 'н'
+            while answer != 'д':
+                number_old_email = int(pretty_input(
+                    'Какой email хотите поменять  ? введите его порядковый номер (1/2/3..) '))
+                if 0 < number_old_email <= len(record.emails):
+                    old_email = record.emails[number_old_email-1].email
+                    answer = pretty_input(f'Этот номер {old_email}?(д/н)')
+                else:
+                    answer = 'н'
+                    pretty_print('У абонента нет столько email')
+            new_email = pretty_input('Введите новый email ')
+            result = record.change_email(old_email, new_email)
+            return f'У абонента изменен email: \n{pretty(record)}'
+        return 'такой записи не существует или поисковом шаблону соответствует более одной записи'
+
+    @error_handler
+    def del_eml(record):
+        if isinstance(record, Record):
+            answer = 'н'
+            while answer != 'д':
+                number_old_email = int(pretty_input(
+                    'Какой email хотите удалить  ? введите его порядковый номер (1/2/3..) '))
+                if 0 < number_old_email <= len(record.emails):
+                    old_email = record.emails[number_old_email-1].email
+                    answer = pretty_input(f'Этот номер {old_email}?(д/н)')
+                else:
+                    answer = 'н'
+                    pretty_print('У абонента нет столько email')
+            result = record.del_email(old_email)
+            return f'У абонента удален email: \ {pretty(record)}'
+        return 'такой записи не существует или поисковом шаблону соответствует более одной записи'
+
     @error_handler
     def change_adr(record):
         if isinstance(record, Record):
@@ -278,6 +317,29 @@ def get_handler(res_pars, addressbook):
             record.add_birthday(birthday_str)
             return f'в запись добавлен день рождения: \n {record.birthday.__repr__()}'
         return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
+
+    @error_handler
+    def search_bd(addressbook):
+        pretty_print(
+            'Будем искать всех у кого дни рождения от первой введенной даты до второй введенной даты ')
+        data_start = pretty_input('Первая дата (формат дд-мм-гггг) ')
+        while True:
+            try:
+
+                datetime.strptime(data_start, "%d-%m-%Y")
+                break
+            except:
+                pretty_print("Это не дата ")
+                data_start = pretty_input(
+                    'Еще раз. Первая дата (формат дд-мм-гггг) ')
+        data_stop = pretty_input('Вторая дата (формат дд-мм-гггг)')
+        try:
+            datetime.strptime(data_stop, "%d-%m-%Y")
+            result = addressbook.search_birthday(data_start, data_stop)
+        except:
+            pretty_print("Это не дата . Будем искать в одном дне")
+            result = addressbook.search_birthday(data_start)
+        return pretty_table(result, N=10)
 
     @error_handler
     def add_phone(record):
@@ -315,7 +377,7 @@ def get_handler(res_pars, addressbook):
         return func_change[item_number](record)
 
     def search(addressbook):
-        user_input = pretty_input('What are you looking for?  ')
+        user_input = pretty_input('Что Вы хотите найти? введите паттерн: ')
         # осуществляет поиск введенной строки во всех текстовых полях адресной книги
         result = addressbook.search(user_input)
 
@@ -368,7 +430,7 @@ def get_handler(res_pars, addressbook):
                 i for i in text_words_list if (i not in stop_words)]
             return prepare_text_words_list
 
-        def find_predictors(sentence, context, commands_scoup=COMMANDS, objects_scoup=OBJECTS):
+        def find_predictors(sentence, context_list, commands_scoup=COMMANDS, objects_scoup=OBJECTS):
             # получает на вход предварительно обработанный список слов из введенной строки, \
             # словарь возможных значений команд и словарь созможных значений объектов (то, над \
             # чем могут совершаться команды). Возвращает словарь, в котором ключами являются \
@@ -469,7 +531,9 @@ def get_handler(res_pars, addressbook):
             print(prepare_text_words_list)  # отладочный вывод
 
             print(predictors_dict)  # отладочный вывод
-
+            if len(predictors_dict['commands']) > 1:
+                raise Exception(
+                    'Сложные команды разбивайте на предложения: не более одного действия в однм предложении (найти\заменить\добавить...)')
             return predictors_dict
 
         def handler_raw(predictors_dict, address_book):
@@ -478,169 +542,45 @@ def get_handler(res_pars, addressbook):
             # возвращает строку с рапортом о совершенных действиях или None\
             #  если никакие действия совершены быть не могут
 
-            if ('search' in predictors_dict['commands']) and predictors_dict['text']:
+            if ('search' in predictors_dict['commands']) and predictors_dict['selected_text']:
+                print('точка 1')
                 chois = pretty_input(
                     f'''распознана команда ПОИСК. \n
                             текст в скобках, по всей видимости, является паттерном для поиска:\n
-                            паттерн: {predictors_dict['text']}\n
+                            паттерн: {predictors_dict['selected_text']}\n
                             Выберите действие:
                                 1. поиск по текущему паттерну
                                 2. ввести новый паттерн
                                 3. поиск по дням рождения (даты и интервалы дат)
                                 4. выход
-                             ''')
-            elif ('search' in predictors_dict['command'] and not predictors_dict['text']):
+                        ''')
+                if chois == '1':
+                    return address_book.search(predictors_dict['selected_text'])
+                elif chois == '2':
+                    return search(address_book)
+                elif chois == '3':
+                    return search_bd(address_book)
+                return True
+
+            elif ('search' in predictors_dict['commands'] and not predictors_dict['selected_text']):
+                print('точка 2')
                 chois = pretty_input(
                     f'''
                         распознана команда ПОИСК. \n
-                        текст в круглых скобках в предложении с командой поиска 
-                        будет воспринят как паттерн
-                        в текущем вводе паттерн не распознан'''
-                )
-                #result = address_book.search(pattern)
-                # pretty_table(result)
-                return 'поиск выполнен'
+                        подсказка: текст в круглых скобках в предложении с 
+                        командой поиска будет воспринят как паттерн
 
-            if not predictors_dict['commands']:
-                return 'ввод не распознан. Получить помощь можно используя команду help'
-
-            if predictors_dict['name']:
-
-                if not predictors_dict['name'] in address_book:
-                    if not 'add' in predictors_dict['commands']:
-                        # для несуществующей записи выбрана команда (не add). Действие не может быть завершено
-                        pretty_print(
-                            f"Распознана команда {'/'.join(predictors_dict['commands'])}, но записи с именем {predictors_dict['name']} не существует. \n Команда не может быть выполнена. Попробуйте еще раз")
-                        return 'невозможно применить введенную команду к несуществующей записи'
-                    # предложить создать новую запись с параметрами из словаря.
-                    record_temp = gen_record(predictors_dict)
-                    pretty_print(
-                        'С введенными параметрами может быть создана новая запись: ')
-                    pretty_table(AddressBook(record_temp))
-                    while True:
-                        enter = pretty_input(
-                            'внести запись в адресную книгу? ("y" - да, "n" - нет)')
-                        if enter == 'y':
-                            address_book.add_record(record_temp)
-                            # вызвать функцию для построчного ввода чего-то
-                            return f'запись {predictors_dict["name"]} внесена в адресную унигу'
-                        elif enter == 'n':
-                            break
-                    return f'запись {predictors_dict["name"]} не сохранена'
-
-                # отобразить текущую запись
-                pretty_print(
-                    f'Текущее содержание записи {predictors_dict["name"]}: ')
-                pretty_table(AddressBook(
-                    address_book[predictors_dict["name"]]))
-                # проверить наличие поля phone и номера телефона
-                if ('phone' in predictors_dict['objects']) and predictors_dict['phones']:
-                    command = predictors_dict['commands'][0]
-                    if command == 'add':
-                        for phone in predictors_dict['phones']:
-                            # вызвать функцию добавления телефона phone в запись predictors_dict["name"]
-                            address_book[predictors_dict["name"]
-                                         ].add_phone(phone)
-
-                        # return f'мы должны тут добавить телефон {phone} в запись {predictors_dict["name"]}'
-                    if command == 'remove':
-                        for phone in predictors_dict['phones']:
-                            # вызвать функцию удаления телефона phone из записи predictors_dict["name"]
-                            address_book[predictors_dict["name"]
-                                         ].del_phone(phone)
-                            pass
-                        # return f'мы должны тут удалить телефон {phone} из записи {predictors_dict["name"]}'
-                    if command == 'change':
-                        # return 'при необходимости заменить телефон в какой-либо записи воспользуйтесь \nцифровым ваантом меню или сначала добавьте новый номер телефона, а потом \nудалмите старый. При свободном вводе я могу перепутать телефоны \n- что приведет к потере важной информации. Извините.'
-                        # проверить наличие поля email и значений email
-                        pass
-                if ('email' in predictors_dict['objects']) and predictors_dict['emails']:
-                    command = predictors_dict['commands'][0]
-                    if command == 'add':
-                        for email in predictors_dict['emails']:
-                            # вызвать функцию добавления email в запись predictors_dict["name"]
-                            pass
-                        # return f'мы должны тут добавить email {email} в запись {predictors_dict["name"]}'
-                    if command == 'remove':
-                        for email in predictors_dict['emails']:
-                            # вызвать функцию удаления телефона phone из записи predictors_dict["name"]
-                            pass
-                        return f'мы должны тут удалить email {email} из записи {predictors_dict["name"]}'
-                    if command == 'change':
-                        # return 'при необходимости заменить email в какой-либо записи воспользуйтесь \nцифровым ваантом меню или сначала добавьте новый email, а потом \nудалмите старый. При свободном вводе я могу перепутать email \n- что приведет к потере важной информации. Извините.'
-                        # значения телефонов найдены, но слово "телефон" не встречается в строке
-                        pass
-                if predictors_dict['phones'] and (not ('phone' in predictors_dict['objects'])):
-                    command = predictors_dict['commands'][0]
-                    if command == 'add':
-                        for phone in predictors_dict['phones']:
-                            # вызвать функцию добавления телефона phone в запись predictors_dict["name"]
-                            address_book[predictors_dict["name"]
-                                         ].add_phone(phone)
-                            print('перед сохранием - уточнить')
-                        # return f'мы должны тут добавить телефон {phone} в запись {predictors_dict["name"]}'
-                    if command == 'remove':
-                        for phone in predictors_dict['phones']:
-                            # вызвать функцию удаления телефона phone из записи predictors_dict["name"]
-                            address_book[predictors_dict["name"]
-                                         ].del_phone(phone)
-                            print('перед сохранием - уточнить')
-                        # return f'мы должны тут удалить телефон {phone} из записи {predictors_dict["name"]}'
-                    if command == 'change':
-                        # return 'при необходимости заменить телефон в какой-либо записи воспользуйтесь \nцифровым ваантом меню или сначала добавьте новый номер телефона, а потом \nудалмите старый. При свободном вводе я могу перепутать телефоны \n- что приведет к потере важной информации. Извините.'
-                        pass
-                if (not ('email' in predictors_dict['objects'])) and predictors_dict['emails']:
-                    command = predictors_dict['commands'][0]
-                    if command == 'add':
-                        for email in predictors_dict['emails']:
-                            # вызвать функцию добавления email в запись predictors_dict["name"]
-                            print('перед сохранием - уточнить')
-                        # return f'мы должны тут добавить email {email} в запись {predictors_dict["name"]}'
-                    if command == 'remove':
-                        for email in predictors_dict['emails']:
-                            # вызвать функцию удаления телефона phone из записи predictors_dict["name"]
-                            print('перед сохранием - уточнить')
-                        # return f'мы должны тут удалить email {email} из записи {predictors_dict["name"]}'
-                    if command == 'change':
-                        pass
-                        # return 'при необходимости заменить email в какой-либо записи воспользуйтесь \nцифровым ваантом меню или сначала добавьте новый email, а потом \nудалмите старый. При свободном вводе я могу перепутать email \n- что приведет к потере важной информации. Извините.'
-                # слово телефон (email) встречается в строке, но значения нет
-                if (not predictors_dict['phones']) and ('phone' in predictors_dict['objects']):
-                    command = predictors_dict['commands'][0]
-                    if command == 'add':
-                        for phone in predictors_dict['phones']:
-                            add_phone(address_book[predictors_dict['name']])
-                            # запросить телефон для добавления
-                            # вызвать функцию добавления телефона phone в запись predictors_dict["name"]
-
-                        # return f'мы должны тут запросить телефон и добавить его в запись {predictors_dict["name"]}'
-                    if command == 'remove':
-                        for phone in predictors_dict['phones']:
-                            # запросить телефон для удаления
-                            # вызвать функцию удаления телефона phone из записи predictors_dict["name"]
-                            pass
-                        # return f'мы должны запросить номер телефона и удалить его из записи {predictors_dict["name"]}'
-                    if command == 'change':
-                        pass
-                        # return 'при необходимости заменить телефон в какой-либо записи воспользуйтесь \nцифровым ваантом меню или сначала добавьте новый номер телефона, а потом \nудалмите старый. При свободном вводе я могу перепутать телефоны \n- что приведет к потере важной информации. Извините.'
-                if ('email' in predictors_dict['objects']) and (not predictors_dict['emails']):
-                    command = predictors_dict['commands'][0]
-                    if command == 'add':
-                        for email in predictors_dict['emails']:
-                            # запросить email
-                            # вызвать функцию добавления email в запись predictors_dict["name"]
-                            pass
-                        # return f'мы должны тут запросить email и добавить его в запись {predictors_dict["name"]}'
-                    if command == 'remove':
-                        for email in predictors_dict['emails']:
-                            # запросить email
-                            # вызвать функцию удаления телефона phone из записи predictors_dict["name"]
-                            pass
-                        # return f'мы должны тут запросить email и удалить его из записи {predictors_dict["name"]}'
-                    if command == 'change':
-                        pass
-                        # return 'при необходимости заменить email в какой-либо записи воспользуйтесь \nцифровым ваантом меню или сначала добавьте новый email, а потом \nудалмите старый. При свободном вводе я могу перепутать email \n- что приведет к потере важной информации. Извините.'
-            return f'обработка записи {predictors_dict["name"]} завершена'
+                        в текущем вводе паттерн не распознан.
+                        Выберите действие:
+                            1. ввести паттерн для поиска
+                            2. поиск по дням рождения (даты и интервалы дат)
+                            3. выход
+                    ''')
+                if chois == '1':
+                    return search(address_book)
+                elif chois == '2':
+                    return search_bd(address_book)
+                return True
 
         def gen_record(predictors_dict):
             # получает словарь выделенных из текста параметров и создает объект типа Record с этими параметрами
@@ -652,39 +592,45 @@ def get_handler(res_pars, addressbook):
             return record
 
             # из сырой строки создаем список предложений
+
         sentences_list = nltk.sent_tokenize(res_pars)
         context_list = []
         for sentence in sentences_list:
             predictors_dict = find_predictors(sentence, context_list)
-            pretty_print(handler_raw(predictors_dict, addressbook))
+            pretty_table(handler_raw(predictors_dict, addressbook))
+
+        return 'обработка строки завершена'
 
     menu_change = '''
     Выберите необходимы пункт меню: 
                             1. Добавить номер телефона (в записи может быть несколько разных номеров).
-                            2. Удалить номер телефона.
-                            3. Добавить e-mail (в записи может быть несколько e-mail).
-                            4. Удалить e-mail.
-                            5. Добавить/заменить дату рождения (может быть только одна).
-                            6. Добавить/заменить почтовый адрес (может быть только один).
-                            7. Добавить заметку (заметки не удаляются, они накапливаются).
+                            2. Изменить номер телефона.
+                            3. Удалить номер телефона.
+                            4. Добавить e-mail (в записи может быть несколько e-mail).
+                            5. Изменить e-mail. 
+                            6. Удалить e-mail.
+                            7. Добавить/заменить дату рождения (может быть только одна).
+                            8. Добавить/заменить почтовый адрес (может быть только один).
+                            9. Добавить заметку (заметки не удаляются, они накапливаются).
                 '''
-
     func_change = {'1': add_phone,
                    '2': change_phone,
-                   '3': add_phone,
-                   '4': change_bd,
-                   '5': add_eml,
-                   '6': change_adr,
-                   '7': add_note,
+                   '3': del_phone,
+                   '4': add_eml,
+                   '5': change_eml,
+                   '6': del_eml,
+                   '7': change_bd,
+                   '8': change_adr,
+                   '9': add_note,
                    }
-
     HANDLING = {
         '1': add_f,
         '2': change_f,
         '3': delete_f,
         '4': search,
-        '5': show_all_f,
-        '6': exit_f,
+        '5': search_bd,
+        '6': show_all_f,
+        '7': exit_f,
         'hello': hello_f,
         'exit': exit_f,
         '.': exit_f,

@@ -5,12 +5,17 @@ from classes_my import AddressBook, Record, Phone, Birthday
 import nltk
 import re
 import pymorphy2
+import itertools
+import textwrap
 
 
 def pretty_print(text, color='green'):
     # функция для Ярослава
-    print(colored(text, color=color))
-    print(chr(3196)*80)
+    len_str = 140
+    text = [el.ljust(len_str) for el in text.split('\n')]
+    text = '\n'.join(text)
+    print(colored(text, color=color, attrs=['reverse']))
+    print(chr(3196)*len_str)
 
 
 def pretty_input(text):
@@ -28,20 +33,23 @@ def pretty_table(addressbook, N=10):
     # вывод для результатов поиска по запросам, так как функции поиска возвращают
     # объект типа addressbook с результатами
     n = int(N)
-    pretty_print(f'всего к выводу {len(addressbook)} записей: ')
-    '''
-    for block in addressbook.out_iterator(n):
-        print(pretty(block))
-        usr_choice = input(colored(
-            'Нажмите "Enter", или введите "q", что бы закончить просмотр.\n', 'yellow'))
-        if usr_choice:
-            """Если пользователь вводит любой символ, его перебрасывает на основное меню."""
-            break
-       continue
-    '''
-    pretty_print(str(addressbook), color='red')
-
-    return colored('Вывод окончен!', 'yellow')
+    if isinstance(addressbook, AddressBook):
+        pretty_print(f'всего к выводу {len(addressbook)} записей: ')
+        for block in addressbook.out_iterator(n):
+            print(pretty(block))
+            usr_choice = input(colored(
+                'Нажмите "Enter", или введите "q", что бы закончить просмотр.\n', 'yellow'))
+            if usr_choice:
+                """Если пользователь вводит любой символ, его перебрасывает на основное меню."""
+                break
+            continue
+        return colored('Вывод окончен!', 'yellow')
+    if isinstance(addressbook, Record):
+        record = addressbook
+        x = AddressBook()
+        x[record.name] = record
+        print(pretty(x))
+    print('объект не является ни записью ни адресной книгой')
 
 
 def pretty(block):
@@ -57,7 +65,7 @@ def pretty(block):
     # vertical_char=chr(9475), horizontal_char=chr(9473), junction_char=chr(9547)
     #  vertical_char="⁝", horizontal_char="᠃", junction_char="྿"
     # ஃ ৹ ∘"܀" "܅" ྿ ፠ ᎒ ። ᠃
-
+    '''
     table = PrettyTable(
         ['Name', 'Birthday', 'Number(s)'], vertical_char="⁝", horizontal_char="᠃", junction_char="྿")
     # table.set_style(ORGMODE)
@@ -69,6 +77,31 @@ def pretty(block):
         xr.append(a)
         table.add_row(xr)
     return colored(table, 'green')
+    '''
+    if isinstance(block, Record):
+        record = block
+        block = AddressBook()
+        block[record.name] = record
+    table = PrettyTable([], vertical_char="ஃ",
+                        horizontal_char="৹", junction_char="ஃ")
+    titles = ('имя'.center(15), 'дата рождения'.center(15), 'телефоны'.center(
+        15), 'email'.center(20), 'адрес'.center(20), 'заметки'.center(20))
+    table.field_names = titles
+    table.align['имя'.center(15)] = 'l'
+    for name, record in block.items():
+        name = name.split()
+        bd = [str(record.birthday)]
+        phone = [phone.phone for phone in record.phones]
+        email = [email.email for email in record.emails]
+        w = textwrap.TextWrapper(width=20, break_long_words=True)
+        address = w.wrap(record.address or '')
+        note = list(record.note.values())
+        x = list(itertools.zip_longest(
+            name, bd, phone, email, address, note, fillvalue=""))
+        # print(x)
+        for lst in x:
+            table.add_row(lst)
+    return colored(table, 'yellow')
 
 
 def deserialize_users(path):
@@ -202,8 +235,7 @@ def get_handler(res_pars, addressbook):
             pattern = pretty_input(
                 'введите имя записи или часть имени/значения поля, которое однозначно определяет запись: ')
             res = addressbook.search(pattern)
-            print(len(res))
-        print(res.items(), '  ', type(res.items()))
+
         name, record = list(res.items())[0]
         pretty_print(f'найдена запись с именем {name}')
         return record
@@ -253,26 +285,31 @@ def get_handler(res_pars, addressbook):
             # позволяет добавить в запись дополнительный телефон
             phone = pretty_input('Введите номер телефона: ')
             record.add_phone(phone)
-            return f'в запись добавлен новый телефон: \n {record}'
-        return 'такой записи не существует или поисковом шаблону соотвекстует более одной записи'
+            return f'в запись добавлен новый телефон: \n{pretty(record)}'
+        return 'такой записи не существует или поисковом шаблону соответствует более одной записи'
 
     @error_handler
     def change_phone(record):
-
-        pretty_print(record)
-        old_phone = pretty_input(
-            'What number you want to change (enter item number) ')
-
-        new_phone = pretty_input('Entry new phone number ')
-        result = record.change_phone(old_phone, new_phone)
-        if isinstance(result, Exception):
-            return result
-        return f'в запись добавлен новый телефон: \n {record}'
+        if isinstance(record, Record):
+            answer = 'н'
+            while answer != 'д':
+                number_old_phone = int(pretty_input(
+                    'Какой номер хотите поменять  ? введите его порядковый номер (1/2/3..) '))
+                if 0 < number_old_phone <= len(record.phones):
+                    old_phone = record.phones[number_old_phone-1].phone
+                    answer = pretty_input(f'Этот номер {old_phone}?(д/н)')
+                else:
+                    answer = 'н'
+                    pretty_print('У абонента нет столько номеров')
+            new_phone = pretty_input('Введите новый номер ')
+            result = record.change_phone(old_phone, new_phone)
+            return f'в запись добавлен новый телефон: \n{pretty(record)}'
+        return 'такой записи не существует или поисковом шаблону соответствует более одной записи'
 
     def change_f(addressbook):
 
         record = search_record(addressbook)
-        pretty_print(record)
+        pretty_table(record)
         pretty_print(menu_change)
         item_number = input('>>>  ')
         return func_change[item_number](record)
@@ -350,7 +387,7 @@ def get_handler(res_pars, addressbook):
                 # выделяет и возвращает из предложения текст, выделенный любой парой
                 # (в начале и в конце) знаков ()
                 # Если не найдено ничго, возвращает None
-                regex = re.compile('(.+)')
+                regex = re.compile('[(].+[)]')
                 result = regex.search(sentence)
                 return result.group()[1:-1] if result else None
 
@@ -441,11 +478,27 @@ def get_handler(res_pars, addressbook):
             # возвращает строку с рапортом о совершенных действиях или None\
             #  если никакие действия совершены быть не могут
 
-            if 'search' in predictors_dict['commands']:
-                pattern = pretty_input(
-                    'распознана команда ПОИСК. \nЧто ищем, брат? Не разобрал, повтори, будь добр... : ')
-                result = address_book.search(pattern)
-                pretty_table(result)
+            if ('search' in predictors_dict['commands']) and predictors_dict['text']:
+                chois = pretty_input(
+                    f'''распознана команда ПОИСК. \n
+                            текст в скобках, по всей видимости, является паттерном для поиска:\n
+                            паттерн: {predictors_dict['text']}\n
+                            Выберите действие:
+                                1. поиск по текущему паттерну
+                                2. ввести новый паттерн
+                                3. поиск по дням рождения (даты и интервалы дат)
+                                4. выход
+                             ''')
+            elif ('search' in predictors_dict['command'] and not predictors_dict['text']):
+                chois = pretty_input(
+                    f'''
+                        распознана команда ПОИСК. \n
+                        текст в круглых скобках в предложении с командой поиска 
+                        будет воспринят как паттерн
+                        в текущем вводе паттерн не распознан'''
+                )
+                #result = address_book.search(pattern)
+                # pretty_table(result)
                 return 'поиск выполнен'
 
             if not predictors_dict['commands']:

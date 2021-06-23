@@ -10,13 +10,20 @@ import textwrap
 from datetime import datetime
 
 
+len_str = 100
+
+
 def pretty_print(text, color='green'):
     # функция для Ярослава
-    len_str = 140
-    text = [el.ljust(len_str) for el in text.split('\n')]
-    text = '\n'.join(text)
-    print(colored(text, color=color, attrs=['reverse']))
-    print(chr(3196)*len_str)
+    if isinstance(text, str):
+        text = [el.ljust(len_str) for el in text.split('\n')]
+        text = '\n'.join(text)
+        print(colored(text, color=color, attrs=['reverse']))
+        print(chr(3196)*len_str)
+    elif isinstance(text, (Record, AddressBook)):
+        pretty_table(text, color='yellow')
+    else:
+        print(colored(text, color='red'))
 
 
 def pretty_input(text):
@@ -28,7 +35,7 @@ def pretty_input(text):
     return user_input
 
 
-def pretty_table(addressbook, N=10):
+def pretty_table(addressbook, N=10, color='yellow'):
     # выводит на экран всю адресную книгу блоками по N записей. Основная обработка
     # реализована как метод класса addressbook, что позволяет использовать аналогичный
     # вывод для результатов поиска по запросам, так как функции поиска возвращают
@@ -44,13 +51,13 @@ def pretty_table(addressbook, N=10):
                 """Если пользователь вводит любой символ, его перебрасывает на основное меню."""
                 break
             continue
-        return colored('Вывод окончен!', 'yellow')
+        return colored('Вывод окончен!', color)
     if isinstance(addressbook, Record):
         record = addressbook
         x = AddressBook()
         x[record.name] = record
         print(pretty(x))
-    print('объект не является ни записью ни адресной книгой')
+    #print('объект не является ни записью ни адресной книгой')
 
 
 def pretty(block):
@@ -66,19 +73,6 @@ def pretty(block):
     # vertical_char=chr(9475), horizontal_char=chr(9473), junction_char=chr(9547)
     #  vertical_char="⁝", horizontal_char="᠃", junction_char="྿"
     # ஃ ৹ ∘"܀" "܅" ྿ ፠ ᎒ ። ᠃
-    '''
-    table = PrettyTable(
-        ['Name', 'Birthday', 'Number(s)'], vertical_char="⁝", horizontal_char="᠃", junction_char="྿")
-    # table.set_style(ORGMODE)
-    nx = str(block).split('\n')
-    for j in range(len(nx) - 1):
-        xr = nx[j].split('SP')
-        a = str(xr.pop(2)).replace(
-            '[', '').replace(']', '').replace(',', '\n')
-        xr.append(a)
-        table.add_row(xr)
-    return colored(table, 'green')
-    '''
     if isinstance(block, Record):
         record = block
         block = AddressBook()
@@ -86,17 +80,20 @@ def pretty(block):
     table = PrettyTable([], vertical_char="ஃ",
                         horizontal_char="৹", junction_char="ஃ")
     titles = ('имя'.center(15), 'дата рождения'.center(15), 'телефоны'.center(
-        15), 'email'.center(20), 'адрес'.center(20), 'заметки'.center(20))
+        15), 'email'.center(20), 'адрес'.center(20), 'заметки'.center(15))
     table.field_names = titles
     table.align['имя'.center(15)] = 'l'
+    table.align['заметки'.center(15)] = 'l'
     for name, record in block.items():
         name = name.split()
         bd = [str(record.birthday)]
         phone = [phone.phone for phone in record.phones]
         email = [email.email for email in record.emails]
-        w = textwrap.TextWrapper(width=20, break_long_words=True)
-        address = w.wrap(record.address or '')
-        note = list(record.note.values())
+        w_ad = textwrap.TextWrapper(width=20, break_long_words=True)
+        address = w_ad.wrap(record.address or '')
+        w_no = textwrap.TextWrapper(width=15, break_long_words=True)
+        note = ' \n'.join([f"{str(k)} : {v}" for k, v in record.note.items()])
+        note = w_no.wrap(note or '')
         x = list(itertools.zip_longest(
             name, bd, phone, email, address, note, fillvalue=""))
         # print(x)
@@ -599,14 +596,12 @@ def get_handler(res_pars, addressbook):
                     return add_f(address_book)
                 elif chois == '2':
                     return True
-            elif ('add' in predictors_dict['commands']) and predictors_dict['name'] and not predictors_dict['objects'] and not predictors_dict['phones'] and not predictors_dict['emails']:
+            elif ('add' in predictors_dict['commands']) and predictors_dict['name'] and (not predictors_dict['objects'] or ('record' in predictors_dict['objects'])) and not predictors_dict['phones'] and not predictors_dict['emails']:
                 if is_in(address_book, predictors_dict['name']):
                     pretty_print(
                         f"запись с именем {predictors_dict['name']} существует")
                     item_number = pretty_input(menu_change)
-                    print('before')
                     record = address_book[predictors_dict['name']]
-                    print('after')
                     pretty_print(record)
                     return func_change[item_number](record)
                 pretty_print(
@@ -619,6 +614,90 @@ def get_handler(res_pars, addressbook):
                 add_eml(record)
                 add_note(record)
                 return f'в адресную книгу внесена запись: \n{record}'
+            elif ('add' in predictors_dict['commands']) and (predictors_dict['name'] or predictors_dict['context']) and predictors_dict['objects'] and (predictors_dict['phones'] or predictors_dict['emails']):
+                name = predictors_dict['name'] or predictors_dict['context']
+                if is_in(address_book, name):
+                    pretty_print(f"""в запись с именем {name} будет добавлены элементы:
+                            телефон - {len(predictors_dict['phones'])} шт
+                            e-mail  - {len(predictors_dict['emails'])} шт""")
+                    choise = pretty_input("""подтвердите операцию:
+                            1. продолжить
+                            2. отменить""")
+                    if choise == '1':
+                        record = address_book[name]
+                        for phone in predictors_dict['phones']:
+                            record.add_phone(phone)
+                        for email in predictors_dict['emails']:
+                            record.add_email(email)
+                        pretty_table(record)
+                        return f"в запись {name} добавлено {len(predictors_dict['phones']) + len(predictors_dict['emails'])} элеметов"
+                    return 'операция отменена'
+                pretty_print(
+                    f'записи с именем {name} - невозможно добавить что-либо. Сначала создайте запись.')
+                pretty_print(
+                    'При написании команд придерживайтесь правила - одно предложени описывает одно действие.')
+                return 'обработка строки завершена'
+            elif ('add' in predictors_dict['commands']) and (predictors_dict['name'] or predictors_dict['context']) and predictors_dict['selected_text'] and ('adress' in predictors_dict['objects'] or 'note' in predictors_dict['objects']):
+                name = predictors_dict['name'] or predictors_dict['context']
+                if is_in(address_book, name):
+                    if 'adress' in predictors_dict['objects'] and 'note' in predictors_dict['objects']:
+                        pretty_print(
+                            f'нельзя за один шаг внести данные и в заметки и в адрес')
+                        pretty_print(
+                            'разделяйте действия по разным предложениям')
+                        return 'обработка строки завершена'
+                    elif 'adress' in predictors_dict['objects']:
+                        pretty_print(
+                            f"в запись {name} будет внесен адрес: \n   {predictors_dict['selected_text']}")
+                        chois = pretty_input("""подтвердите действие:
+                                1. продолжить
+                                2. отменить""")
+                        if chois == '1':
+                            record = address_book[name]
+                            record.add_address(
+                                predictors_dict['selected_text'])
+                            pretty_table(record)
+                            return f"в запись {name} добавлен адрес"
+                        return 'операция отменена'
+                    elif 'note' in predictors_dict['objects']:
+                        pretty_print(
+                            f"в запись {name} будет внесена заметка: \n   {predictors_dict['selected_text']}")
+                        chois = pretty_input("""подтвердите действие:
+                                1. продолжить
+                                2. отменить""")
+                        if chois == '1':
+                            record = address_book[name]
+                            record.add_note(
+                                predictors_dict['selected_text'])
+                            pretty_table(record)
+                            return f"в запись {name} добавлена заметка"
+                        return 'операция отменена'
+                pretty_print(
+                    f'записи с именем {name} - невозможно добавить что-либо. Сначала создайте запись.')
+                pretty_print(
+                    'При написании команд придерживайтесь правила - одно предложени описывает одно действие.')
+                return 'обработка строки завершена'
+            elif ('add' in predictors_dict['commands']) and (predictors_dict['name'] or predictors_dict['context']) and ('birthday' in predictors_dict['objects']):
+                name = predictors_dict['name'] or predictors_dict['context']
+                if is_in(address_book, name):
+                    record = address_book[name]
+                    birthday_str = pretty_input(
+                        'введите день рождения в формате дд-мм-гггг: ')
+                    record.add_birthday(birthday_str)
+                    pretty_table(record)
+                    return f'в запись добавлен день рождения: \n {record.birthday.__repr__()}'
+                pretty_print(
+                    f'записи с именем {name} - невозможно добавить что-либо. Сначала создайте запись.')
+                pretty_print(
+                    'При написании команд придерживайтесь правила - одно предложени описывает одно действие.')
+                return 'обработка строки завершена'
+
+            if ('change' in predictors_dict['commands'] and not (predictors_dict['name'] or predictors_dict['context'])):
+                pretty_print(
+                    'изменение значений полей невозможно без указания имени записи\n имя записи не распознано')
+                return 'обработка строки завершена'
+            elif ('change' in predictors_dict['commands']):
+                pass
 
         def gen_record(predictors_dict):
             # получает словарь выделенных из текста параметров и создает объект типа Record с этими параметрами
@@ -635,7 +714,7 @@ def get_handler(res_pars, addressbook):
         context_list = []
         for sentence in sentences_list:
             predictors_dict = find_predictors(sentence, context_list)
-            pretty_table(handler_raw(predictors_dict, addressbook))
+            pretty_print(handler_raw(predictors_dict, addressbook))
 
         return 'обработка строки завершена'
 
